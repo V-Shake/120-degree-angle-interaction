@@ -90,10 +90,9 @@ let currentChecks = [];
 let countdownActive = true;
 let cycleStartTime = 0;
 let countdownButton;
-let matchTextAlpha = 0;
-
-const ANNIVERSARY_TEXT =
-  "同济大学建校120周年\n120TH ANNIVERSARY OF TONGJI UNIVERSITY\n1907-2027";
+let successOverlayAlpha = 0;
+let stableAllMatchedFrames = 0;
+const REQUIRED_MATCH_FRAMES = 6;
 
 function setup() {
   createCanvas(CANVAS_W, CANVAS_H);
@@ -145,7 +144,7 @@ function draw() {
   drawReferenceGuides();
   drawHeader();
   drawAngleReadout();
-  drawMatchLabel();
+  drawSuccessOverlay();
 }
 
 function drawMirroredVideoContain() {
@@ -173,6 +172,8 @@ function drawMirroredVideoContain() {
 
 function initializePoseChecks() {
   const pose = heroPoses[currentPoseIndex];
+  stableAllMatchedFrames = 0;
+  successOverlayAlpha = 0;
 
   currentChecks = pose.targets.map(() => ({
     angle: null,
@@ -184,6 +185,19 @@ function initializePoseChecks() {
     vertexX: width / 2,
     vertexY: height / 2
   }));
+
+  if (pose.name === "The Archer" && currentChecks.length >= 2) {
+    // Archer guide 1: fixed top-left, opening toward left side.
+    currentChecks[0].guideX = 215;
+    currentChecks[0].guideY = 420;
+    currentChecks[0].guideRotationDeg = 300;
+
+    // Archer guide 2: fixed bottom-right, opening toward right side.
+    currentChecks[1].guideX = width - 185;
+    currentChecks[1].guideY = height - 420;
+    currentChecks[1].guideRotationDeg = 130;
+    return;
+  }
 
   placeGuidesRandomly();
 }
@@ -227,6 +241,7 @@ function keyPressed() {
 
 function updateAngleChecks(pose) {
   const poseDef = heroPoses[currentPoseIndex];
+  const usedAlternativeKeys = new Set();
 
   for (let i = 0; i < currentChecks.length; i++) {
     const check = currentChecks[i];
@@ -235,6 +250,11 @@ function updateAngleChecks(pose) {
     let best = null;
 
     for (const alt of target.alternatives) {
+      const altKey = `${alt.a}|${alt.b}|${alt.c}`;
+      if (usedAlternativeKeys.has(altKey)) {
+        continue;
+      }
+
       const pA = getKeypointByName(pose, alt.a);
       const pB = getKeypointByName(pose, alt.b);
       const pC = getKeypointByName(pose, alt.c);
@@ -258,6 +278,7 @@ function updateAngleChecks(pose) {
           best = {
             angle: angleValue,
             error,
+            altKey,
             vertexX: mirrorAndMapX(pB.position.x),
             vertexY: mapYToCanvas(pB.position.y)
           };
@@ -270,6 +291,7 @@ function updateAngleChecks(pose) {
       check.isMatch = best.error <= THRESHOLD;
       check.vertexX = best.vertexX;
       check.vertexY = best.vertexY;
+      usedAlternativeKeys.add(best.altKey);
     } else {
       check.angle = null;
       check.isMatch = false;
@@ -452,25 +474,43 @@ function drawAngleReadout() {
   }
 }
 
-function drawMatchLabel() {
-  const allMatched = currentChecks.length > 0 && currentChecks.every((c) => c.isMatch);
-  const alphaTarget = allMatched ? 255 : 0;
-  matchTextAlpha = lerp(matchTextAlpha, alphaTarget, 0.12);
+function drawSuccessOverlay() {
+  const allMatchedNow =
+    currentChecks.length > 0 &&
+    currentChecks.every((c) => c.angle !== null && c.isMatch);
 
-  if (matchTextAlpha < 2) {
+  // Allow small PoseNet jitter: build up when matched, decay when not.
+  if (allMatchedNow) {
+    stableAllMatchedFrames = min(REQUIRED_MATCH_FRAMES, stableAllMatchedFrames + 1);
+  } else {
+    stableAllMatchedFrames = max(0, stableAllMatchedFrames - 1);
+  }
+
+  const allMatched = stableAllMatchedFrames >= REQUIRED_MATCH_FRAMES;
+  const alphaTarget = allMatched ? 235 : 0;
+  successOverlayAlpha = lerp(successOverlayAlpha, alphaTarget, 0.12);
+
+  if (successOverlayAlpha < 2) {
     return;
   }
 
-  const firstMatch = currentChecks.find((c) => c.isMatch);
-  if (!firstMatch) {
-    return;
-  }
+  noStroke();
+  fill(10, 10, 10, successOverlayAlpha);
+  rect(0, 0, width, height);
 
   textAlign(CENTER, CENTER);
-  textSize(24);
+  textSize(56);
   noStroke();
-  fill(60, 220, 110, matchTextAlpha);
-  text(ANNIVERSARY_TEXT, firstMatch.vertexX, firstMatch.vertexY - 60);
+  fill(60, 220, 110, successOverlayAlpha);
+  text("MATCHES!", width / 2, height / 2 - 35);
+
+  textSize(24);
+  fill(255, successOverlayAlpha);
+  text(
+    "You can see on your phone the successful moment.",
+    width / 2,
+    height / 2 + 30
+  );
 }
 
 function calculateAngleDegrees(pointA, pointB, pointC) {
