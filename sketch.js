@@ -78,7 +78,14 @@ const heroPoses = [
     targets: [
       {
         alternatives: [
-          { a: "leftWrist", b: "nose", c: "rightWrist" }
+          { a: "leftShoulder", b: "leftElbow", c: "leftWrist" },
+          { a: "rightShoulder", b: "rightElbow", c: "rightWrist" }
+        ]
+      },
+      {
+        alternatives: [
+          { a: "rightShoulder", b: "rightElbow", c: "rightWrist" },
+          { a: "leftShoulder", b: "leftElbow", c: "leftWrist" }
         ]
       }
     ]
@@ -216,6 +223,19 @@ function initializePoseChecks() {
     currentChecks[2].guideX = 190;
     currentChecks[2].guideY = 540;
     currentChecks[2].guideRotationDeg = 260;
+    return;
+  }
+
+  if (pose.name === "The V-Sign" && currentChecks.length >= 1) {
+    // V-Sign guide 1: fixed upper-left target.
+    currentChecks[0].guideX = 210;
+    currentChecks[0].guideY = 600;
+    currentChecks[0].guideRotationDeg = 240;
+
+    // V-Sign guide 2: fixed upper-right target.
+    currentChecks[1].guideX = width - 210;
+    currentChecks[1].guideY = 620;
+    currentChecks[1].guideRotationDeg = 190;
     return;
   }
 
