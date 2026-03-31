@@ -18,6 +18,7 @@ let canvasRenderer;
 const TARGET_ANGLE = 120;
 const THRESHOLD = 5;
 const MIN_CONFIDENCE = 0.35;
+const SILHOUETTE_MIN_CONFIDENCE = 0.14;
 const GUIDE_LENGTH = 86;
 const CYCLE_DURATION = 30; // seconds
 const COUNTDOWN_CIRCLE_R = 38;
@@ -99,6 +100,8 @@ let currentChecks = [];
 let countdownActive = true;
 let cycleStartTime = 0;
 let countdownButton;
+let silhouetteButton;
+let visualMode = 0; // 0=skeleton, 1=silhouette, 2=hybrid
 let successOverlayAlpha = 0;
 let stableAllMatchedFrames = 0;
 let successLatched = false;
@@ -133,6 +136,13 @@ function setup() {
   countdownButton.style("justify-content", "center");
   countdownButton.style("text-align", "center");
   countdownButton.mousePressed(toggleCountdown);
+
+  silhouetteButton = createButton("Visual: Skeleton");
+  silhouetteButton.size(170, 34);
+  silhouetteButton.style("font-size", "14px");
+  silhouetteButton.style("padding", "0 10px");
+  silhouetteButton.mousePressed(toggleSilhouetteMode);
+
   positionCountdownButton();
 
   cycleStartTime = millis();
@@ -149,6 +159,14 @@ function draw() {
 
   if (pose) {
     updateAngleChecks(pose);
+    if (visualMode >= 1) {
+      drawBodyMask(pose);
+    }
+    if (visualMode === 2) {
+      drawPatternAccents(pose);
+    }
+
+    // Keep skeleton lines visible in white in all modes.
     drawUserSilhouette(pose);
   } else {
     for (const check of currentChecks) {
@@ -257,6 +275,18 @@ function toggleCountdown() {
 
   if (countdownActive) {
     cycleStartTime = millis();
+  }
+}
+
+function toggleSilhouetteMode() {
+  visualMode = (visualMode + 1) % 3;
+
+  if (visualMode === 0) {
+    silhouetteButton.html("Visual: Skeleton");
+  } else if (visualMode === 1) {
+    silhouetteButton.html("Visual: Silhouette");
+  } else {
+    silhouetteButton.html("Visual: Hybrid");
   }
 }
 
@@ -499,17 +529,17 @@ function drawHeader() {
   noStroke();
   textAlign(CENTER, TOP);
   textSize(22);
-  text(heroPoses[currentPoseIndex].name, width / 2, 14);
+  text(heroPoses[currentPoseIndex].name, width / 2, 56);
 
   textSize(12);
-  text("Keys: 1 / 2 / 3 to switch poses", width / 2, 44);
+  text("Keys: 1 / 2 / 3 to switch poses", width / 2, 84);
 
   drawCountdownCircle(remaining);
   positionCountdownButton();
 }
 
 function positionCountdownButton() {
-  if (!canvasRenderer || !countdownButton) {
+  if (!canvasRenderer || !countdownButton || !silhouetteButton) {
     return;
   }
 
@@ -518,11 +548,208 @@ function positionCountdownButton() {
   const circleBottomY = 62 + COUNTDOWN_CIRCLE_R;
   const btnW = 48;
   const btnGap = 12;
+  const silhouetteW = 170;
 
   countdownButton.position(
     rect.left + circleCenterX - btnW / 2,
     rect.top + circleBottomY + btnGap
   );
+
+  silhouetteButton.position(
+    rect.left + width / 2 - silhouetteW / 2,
+    rect.top + 12
+  );
+}
+
+function drawBodyMask(pose) {
+  const ls = getMappedKeypoint(pose, "leftShoulder", SILHOUETTE_MIN_CONFIDENCE);
+  const rs = getMappedKeypoint(pose, "rightShoulder", SILHOUETTE_MIN_CONFIDENCE);
+  const lh = getMappedKeypoint(pose, "leftHip", SILHOUETTE_MIN_CONFIDENCE);
+  const rh = getMappedKeypoint(pose, "rightHip", SILHOUETTE_MIN_CONFIDENCE);
+
+  const bodyAnchorNames = [
+    "leftShoulder",
+    "rightShoulder",
+    "leftElbow",
+    "rightElbow",
+    "leftHip",
+    "rightHip",
+    "leftKnee",
+    "rightKnee"
+  ];
+  let detectedBodyAnchors = 0;
+  for (const name of bodyAnchorNames) {
+    if (getMappedKeypoint(pose, name, SILHOUETTE_MIN_CONFIDENCE)) {
+      detectedBodyAnchors += 1;
+    }
+  }
+
+  // Avoid rendering a face-only blob when body tracking is weak.
+  if (detectedBodyAnchors < 4) {
+    return;
+  }
+
+  noStroke();
+  fill(0, 210);
+
+  // Torso polygon creates a stable central body mass.
+  if (ls && rs && rh && lh) {
+    beginShape();
+    vertex(ls.x, ls.y);
+    vertex(rs.x, rs.y);
+    vertex(rh.x, rh.y);
+    vertex(lh.x, lh.y);
+    endShape(CLOSE);
+  }
+
+  drawSilhouetteLimb(pose, "leftShoulder", "leftElbow", 44, 34);
+  drawSilhouetteLimb(pose, "leftElbow", "leftWrist", 34, 24);
+  drawSilhouetteLimb(pose, "rightShoulder", "rightElbow", 44, 34);
+  drawSilhouetteLimb(pose, "rightElbow", "rightWrist", 34, 24);
+
+  drawSilhouetteLimb(pose, "leftHip", "leftKnee", 52, 42);
+  drawSilhouetteLimb(pose, "leftKnee", "leftAnkle", 42, 30);
+  drawSilhouetteLimb(pose, "rightHip", "rightKnee", 52, 42);
+  drawSilhouetteLimb(pose, "rightKnee", "rightAnkle", 42, 30);
+
+  // Neck / shoulder bridge improves silhouette continuity.
+  drawSilhouetteLimb(pose, "leftShoulder", "rightShoulder", 30, 30);
+
+  // Draw head only when enough anchor points exist.
+  drawHeadSilhouette(pose, ls, rs);
+}
+
+function drawPatternAccents(pose) {
+  const accentJoints = [
+    ["leftShoulder", "leftElbow"],
+    ["rightShoulder", "rightElbow"],
+    ["leftElbow", "leftWrist"],
+    ["rightElbow", "rightWrist"],
+    ["leftHip", "leftKnee"],
+    ["rightHip", "rightKnee"],
+    ["leftKnee", "leftAnkle"],
+    ["rightKnee", "rightAnkle"]
+  ];
+
+  for (let i = 0; i < accentJoints.length; i++) {
+    // Sparse twinkle effect so accents stay clean and not too dense.
+    if ((frameCount + i * 5) % 18 > 10) {
+      continue;
+    }
+
+    const [jointName, refName] = accentJoints[i];
+    const joint = getMappedKeypoint(pose, jointName, MIN_CONFIDENCE);
+    const ref = getMappedKeypoint(pose, refName, MIN_CONFIDENCE);
+
+    if (!joint || !ref) {
+      continue;
+    }
+
+    const base = atan2(ref.y - joint.y, ref.x - joint.x);
+    const len = 22 + ((i * 7) % 9);
+
+    // Soft glow underlay.
+    stroke(120, 255, 245, 70);
+    strokeWeight(5);
+    strokeCap(ROUND);
+    draw120Motif(joint.x, joint.y, base, len);
+
+    // Crisp accent line.
+    stroke(235, 255, 255, 210);
+    strokeWeight(2.2);
+    draw120Motif(joint.x, joint.y, base, len);
+  }
+}
+
+function draw120Motif(x, y, baseAngle, length) {
+  const x1 = x + cos(baseAngle) * length;
+  const y1 = y + sin(baseAngle) * length;
+  line(x, y, x1, y1);
+
+  const second = baseAngle + radians(120);
+  const x2 = x + cos(second) * length;
+  const y2 = y + sin(second) * length;
+  line(x, y, x2, y2);
+}
+
+function drawSilhouetteLimb(pose, startName, endName, startWidth, endWidth) {
+  const start = getMappedKeypoint(pose, startName, SILHOUETTE_MIN_CONFIDENCE);
+  const end = getMappedKeypoint(pose, endName, SILHOUETTE_MIN_CONFIDENCE);
+  if (!start || !end) {
+    return;
+  }
+
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) {
+    return;
+  }
+
+  const nx = -dy / len;
+  const ny = dx / len;
+  const s = startWidth * 0.5;
+  const e = endWidth * 0.5;
+
+  noStroke();
+  fill(0, 215);
+
+  beginShape();
+  vertex(start.x + nx * s, start.y + ny * s);
+  vertex(end.x + nx * e, end.y + ny * e);
+  vertex(end.x - nx * e, end.y - ny * e);
+  vertex(start.x - nx * s, start.y - ny * s);
+  endShape(CLOSE);
+
+  // Round caps for smoother organic silhouette.
+  ellipse(start.x, start.y, startWidth, startWidth);
+  ellipse(end.x, end.y, endWidth, endWidth);
+}
+
+function drawHeadSilhouette(pose, leftShoulder, rightShoulder) {
+  const nose = getMappedKeypoint(pose, "nose", SILHOUETTE_MIN_CONFIDENCE);
+  const leftEar = getMappedKeypoint(pose, "leftEar", SILHOUETTE_MIN_CONFIDENCE);
+  const rightEar = getMappedKeypoint(pose, "rightEar", SILHOUETTE_MIN_CONFIDENCE);
+  const leftEye = getMappedKeypoint(pose, "leftEye", SILHOUETTE_MIN_CONFIDENCE);
+  const rightEye = getMappedKeypoint(pose, "rightEye", SILHOUETTE_MIN_CONFIDENCE);
+
+  // Avoid a lone face blob when body anchors are missing.
+  if (!nose || !leftShoulder || !rightShoulder) {
+    return;
+  }
+
+  // Require at least one lateral face anchor for stable head sizing.
+  if (!(leftEar && rightEar) && !(leftEye && rightEye)) {
+    return;
+  }
+
+  let headW;
+  if (leftEar && rightEar) {
+    headW = dist(leftEar.x, leftEar.y, rightEar.x, rightEar.y) * 1.45;
+  } else if (leftEye && rightEye) {
+    headW = dist(leftEye.x, leftEye.y, rightEye.x, rightEye.y) * 2.7;
+  } else {
+    headW = dist(leftShoulder.x, leftShoulder.y, rightShoulder.x, rightShoulder.y) * 0.42;
+  }
+
+  headW = constrain(headW, 58, 135);
+  const headH = headW * 1.22;
+
+  noStroke();
+  fill(0, 220);
+  ellipse(nose.x, nose.y - headH * 0.12, headW, headH);
+}
+
+function getMappedKeypoint(pose, name, minScore = MIN_CONFIDENCE) {
+  const kp = getKeypointByName(pose, name);
+  if (!kp || kp.score <= minScore) {
+    return null;
+  }
+
+  return {
+    x: mirrorAndMapX(kp.position.x),
+    y: mapYToCanvas(kp.position.y)
+  };
 }
 
 function drawCountdownCircle(remaining) {
