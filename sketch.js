@@ -92,6 +92,7 @@ let cycleStartTime = 0;
 let countdownButton;
 let successOverlayAlpha = 0;
 let stableAllMatchedFrames = 0;
+let successLatched = false;
 const REQUIRED_MATCH_FRAMES = 6;
 
 function setup() {
@@ -174,6 +175,7 @@ function initializePoseChecks() {
   const pose = heroPoses[currentPoseIndex];
   stableAllMatchedFrames = 0;
   successOverlayAlpha = 0;
+  successLatched = false;
 
   currentChecks = pose.targets.map(() => ({
     angle: null,
@@ -487,7 +489,11 @@ function drawSuccessOverlay() {
   }
 
   const allMatched = stableAllMatchedFrames >= REQUIRED_MATCH_FRAMES;
-  const alphaTarget = allMatched ? 235 : 0;
+  if (allMatched) {
+    successLatched = true;
+  }
+
+  const alphaTarget = successLatched ? 235 : 0;
   successOverlayAlpha = lerp(successOverlayAlpha, alphaTarget, 0.12);
 
   if (successOverlayAlpha < 2) {
