@@ -13,12 +13,14 @@
 let video;
 let poseNet;
 let poses = [];
+let canvasRenderer;
 
 const TARGET_ANGLE = 120;
 const THRESHOLD = 5;
 const MIN_CONFIDENCE = 0.35;
 const GUIDE_LENGTH = 86;
 const CYCLE_DURATION = 30; // seconds
+const COUNTDOWN_CIRCLE_R = 38;
 
 // Visual canvas is vertical and larger.
 const CANVAS_W = 700;
@@ -103,7 +105,7 @@ let successLatched = false;
 const REQUIRED_MATCH_FRAMES = 6;
 
 function setup() {
-  createCanvas(CANVAS_W, CANVAS_H);
+  canvasRenderer = createCanvas(CANVAS_W, CANVAS_H);
 
   // Camera at 4:3. We render it with contain fit to avoid stretching.
   video = createCapture(VIDEO);
@@ -121,10 +123,17 @@ function setup() {
   angleMode(DEGREES);
   textAlign(CENTER, CENTER);
 
-  countdownButton = createButton("Stop Countdown");
-  countdownButton.position(width - 170, 14);
-  countdownButton.size(150, 34);
+  countdownButton = createButton("⏸");
+  countdownButton.size(48, 34);
+  countdownButton.style("font-size", "18px");
+  countdownButton.style("padding", "0");
+  countdownButton.style("line-height", "1");
+  countdownButton.style("display", "flex");
+  countdownButton.style("align-items", "center");
+  countdownButton.style("justify-content", "center");
+  countdownButton.style("text-align", "center");
   countdownButton.mousePressed(toggleCountdown);
+  positionCountdownButton();
 
   cycleStartTime = millis();
   initializePoseChecks();
@@ -244,7 +253,7 @@ function initializePoseChecks() {
 
 function toggleCountdown() {
   countdownActive = !countdownActive;
-  countdownButton.html(countdownActive ? "Stop Countdown" : "Start Countdown");
+  countdownButton.html(countdownActive ? "⏸" : "▶");
 
   if (countdownActive) {
     cycleStartTime = millis();
@@ -492,11 +501,62 @@ function drawHeader() {
   textSize(22);
   text(heroPoses[currentPoseIndex].name, width / 2, 14);
 
-  textSize(18);
-  text(countdownActive ? `Next pose in ${remaining.toFixed(1)}s` : "Countdown paused", width / 2, 44);
-
   textSize(12);
-  text("Keys: 1 / 2 / 3 to switch poses", width / 2, 68);
+  text("Keys: 1 / 2 / 3 to switch poses", width / 2, 44);
+
+  drawCountdownCircle(remaining);
+  positionCountdownButton();
+}
+
+function positionCountdownButton() {
+  if (!canvasRenderer || !countdownButton) {
+    return;
+  }
+
+  const rect = canvasRenderer.elt.getBoundingClientRect();
+  const circleCenterX = width - 70;
+  const circleBottomY = 62 + COUNTDOWN_CIRCLE_R;
+  const btnW = 48;
+  const btnGap = 12;
+
+  countdownButton.position(
+    rect.left + circleCenterX - btnW / 2,
+    rect.top + circleBottomY + btnGap
+  );
+}
+
+function drawCountdownCircle(remaining) {
+  const cx = width - 70;
+  const cy = 62;
+  const d = COUNTDOWN_CIRCLE_R * 2;
+  const progress = constrain(remaining / CYCLE_DURATION, 0, 1);
+
+  push();
+  angleMode(DEGREES);
+
+  // Background ring.
+  noFill();
+  stroke(255, 70);
+  strokeWeight(7);
+  circle(cx, cy, d);
+
+  // Progress ring, starts from top and goes clockwise.
+  stroke(countdownActive ? color(60, 220, 110) : color(180));
+  strokeWeight(8);
+  strokeCap(ROUND);
+  arc(cx, cy, d, d, -90, -90 + progress * 360);
+
+  // Numeric value in center.
+  noStroke();
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(16);
+  text(`${ceil(remaining)}s`, cx, cy - 2);
+
+  textSize(10);
+  fill(220);
+  text(countdownActive ? "NEXT" : "PAUSED", cx, cy + 14);
+  pop();
 }
 
 function drawAngleReadout() {
