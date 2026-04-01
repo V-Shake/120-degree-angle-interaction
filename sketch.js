@@ -222,44 +222,44 @@ function initializePoseChecks() {
     vertexY: height / 2
   }));
 
-  if (pose.name === "The Archer" && currentChecks.length >= 2) {
-    // Archer guide 1: fixed top-left, opening toward left side.
+  if (pose.name === "The Peak" && currentChecks.length >= 2) {
+    // Peak guide 1: fixed top-left, opening toward left side.
     currentChecks[0].guideX = 215;
     currentChecks[0].guideY = 420;
     currentChecks[0].guideRotationDeg = 300;
 
-    // Archer guide 2: fixed bottom-right, opening toward right side.
+    // Peak guide 2: fixed bottom-right, opening toward right side.
     currentChecks[1].guideX = width - 185;
     currentChecks[1].guideY = height - 420;
     currentChecks[1].guideRotationDeg = 130;
     return;
   }
 
-  if (pose.name === "The Brisk Walker" && currentChecks.length >= 3) {
-    // Brisk Walker guide 1: upper-right arm target.
+  if (pose.name === "The Sprinter" && currentChecks.length >= 3) {
+    // Sprinter guide 1: upper-right arm target.
     currentChecks[0].guideX = width - 210;
     currentChecks[0].guideY = 500;
     currentChecks[0].guideRotationDeg = 80;
 
-    // Brisk Walker guide 2: lower-middle leg target.
+    // Sprinter guide 2: lower-middle leg target.
     currentChecks[1].guideX = width - 410;
     currentChecks[1].guideY = height - 420;
     currentChecks[1].guideRotationDeg = 335;
 
-    // Brisk Walker guide 3: middle-left arm target.
+    // Sprinter guide 3: middle-left arm target.
     currentChecks[2].guideX = 190;
     currentChecks[2].guideY = 540;
     currentChecks[2].guideRotationDeg = 260;
     return;
   }
 
-  if (pose.name === "The V-Sign" && currentChecks.length >= 1) {
-    // V-Sign guide 1: fixed upper-left target.
+  if (pose.name === "The Horizon" && currentChecks.length >= 1) {
+    // Horizon guide 1: fixed upper-left target.
     currentChecks[0].guideX = 210;
     currentChecks[0].guideY = 600;
     currentChecks[0].guideRotationDeg = 240;
 
-    // V-Sign guide 2: fixed upper-right target.
+    // Horizon guide 2: fixed upper-right target.
     currentChecks[1].guideX = width - 210;
     currentChecks[1].guideY = 620;
     currentChecks[1].guideRotationDeg = 190;
