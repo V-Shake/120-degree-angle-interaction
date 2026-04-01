@@ -37,7 +37,7 @@ let camDrawH = 0;
 // Each triplet is angle ABC, where B is vertex.
 const heroPoses = [
   {
-    name: "The Archer",
+    name: "The Peak",
     targets: [
       {
         alternatives: [
@@ -54,7 +54,7 @@ const heroPoses = [
     ]
   },
   {
-    name: "The Brisk Walker",
+    name: "The Sprinter",
     targets: [
       {
         alternatives: [
@@ -77,7 +77,7 @@ const heroPoses = [
     ]
   },
   {
-    name: "The V-Sign",
+    name: "The Horizon",
     targets: [
       {
         alternatives: [
